@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emotion and Character Response</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: Arial, sans-serif;
+            overflow-x: hidden;
+        }
+
+        #orbContainer {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+            z-index: 5;
+        }
+
+        .orb {
+            position: absolute;
+        
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            opacity: 0.8;
+            background-size: cover;
+            
+        }
+
+        
+
+        #background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('../inside-out-rileys-headquarters.jpeg') no-repeat center center;
+            background-size: cover;
+            z-index: 1;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('../download.png') no-repeat center center;
+            background-size: cover;
+            z-index: 2;
+        }
+
+        #chatWindow {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50%;
+            height: 50%;
+            overflow-y: scroll;
+            z-index: 30;
+            background: none;
+            padding: 10px;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            
+        }
+
+        #chatWindow::-webkit-scrollbar {
+            display: none;
+        }
+
+        #inputArea {
+            position: absolute;
+            bottom: 5%;
+            width: 50%;
+            left: 25%;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            z-index: 6;
+            background-color: rgba(255, 255, 255, 0.493);
+            box-sizing: border-box;
+            border-radius: 5px;
+        }
+
+        #inputText {
+            width: 50%;
+            max-width: 500px;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            margin-right: 10px;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+
+        #predictButton {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        .output-item {
+            display: flex;
+            justify-content: flex-start;
+            margin-bottom: 10px;
+            position: relative;
+        }
+
+        .output-item.right {
+            justify-content: flex-end;
+        }
+
+        .output-bubble {
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 60%;
+            font-size: 14px;
+            background-color: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .output-bubble.left {
+            background-color: #e0e0e0;
+            text-align: left;
+        }
+
+        .output-bubble.right {
+            background-color: #a0e0a0;
+            text-align: right;
+        }
+
+        .output-bubble.fade-out::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 20px;
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgb(160, 224, 160) 100%);
+            pointer-events: none;
+        }
+
+        .character-image {
+            width: 58px; /* 캐릭터 이미지 크기 */
+            height: 58px;
+            border-radius: 50%; /* 원형으로 설정 */
+            margin-right: 10px; /* 버블과의 여백 */
+            background-size: cover;
+            background-position: center;
+        }
+
+        .left-item {
+            display: flex;
+            align-items: center; /* 수직 정렬 */
+        }
+    </style>
+</head>
+<body>
+    <div id="background"></div>
+    <div id="overlay"></div>
+    <div id="orbContainer"></div>
+    <div id="chatWindow"></div>
+    <div id="inputArea">
+        <input type="text" id="inputText" placeholder="Enter your sentence here...">
+        <button id="predictButton">Predict</button>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.17.1/matter.min.js"></script>
+    <script>
+        const chatWindow = document.getElementById('chatWindow');
+        const inputText = document.getElementById('inputText');
+        const predictButton = document.getElementById('predictButton');
+        const orbContainer = document.getElementById('orbContainer');
+        
+        // Matter.js 설정
+        const { Engine, Render, Runner, Bodies, Composite, World } = Matter;
+        const engine = Engine.create();
+        const world = engine.world;
+
+        const render = Render.create({
+            element: orbContainer,
+            engine: engine,
+            options: {
+                width: window.innerWidth,
+                height: window.innerHeight,
+                wireframes: false,
+                background: 'transparent'
+            }
+        });
+
+        Render.run(render);
+        const runner = Runner.create();
+        Runner.run(runner, engine);
+
+        // 지면 생성
+        const ground = Bodies.rectangle(window.innerWidth / 2, window.innerHeight - 0, window.innerWidth, 60, { isStatic: true });
+        World.add(world, ground);
+
+        function createOrb(emotion) {
+            const orbTextures = {
+                "슬픔": "./clean_size/blue.png",
+                "화남": "./clean_size/red.png",
+                "불안": "./clean_size/purple.png",
+                "기쁨": "./clean_size/yellow.png",
+                "까칠": "./clean_size/green.png",
+                "슬픔, 화남": "./clean_size/b_r.png",
+                "화남, 슬픔": "./clean_size/b_r.png",
+                "슬픔, 불안": "./clean_size/b_p.png",
+                "불안, 슬픔": "./clean_size/b_p.png",
+                "슬픔, 기쁨": "./clean_size/b_y.png",
+                "기쁨, 슬픔": "./clean_size/b_y.png",
+                "슬픔, 까칠": "./clean_size/b_g.png",
+                "까칠, 슬픔": "./clean_size/b_g.png",
+                "불안, 까칠": "./clean_size/g_p.png",
+                "까칠, 불안": "./clean_size/g_p.png",
+                "화남, 까칠": "./clean_size/g_r.png",
+                "까칠, 화남": "./clean_size/g_r.png",
+                "기쁨, 까칠": "./clean_size/g_y.png",
+                "까칠, 기쁨": "./clean_size/g_y.png",
+                "불안, 기쁨": "./clean_size/p_y.png",
+                "기쁨, 불안": "./clean_size/p_y.png",
+                "불안, 화남": "./clean_size/r_p.png",
+                "화남, 불안": "./clean_size/r_p.png",
+                "화남, 기쁨": "./clean_size/r_y.png",
+                "기쁨, 화남": "./clean_size/r_y.png",
+            };
+        
+            
+        
+            //emotion = extractEmotions(emotion);
+        
+            console.log(emotion);
+        
+            // 감정 문자열에서 2개의 감정이 모두 포함된 키를 찾아 반환
+            function findMatchingEmotion(emotionString) {
+                const matchedKeys = [];
+                for (const key in orbTextures) {
+                    const emotionsInKey = key.split(',').map(e => e.trim());
+                    // 키에 있는 모든 감정이 주어진 emotion 문자열에 포함되었는지 확인
+                    if (emotionsInKey.every(emotion => emotionString.includes(emotion))) {
+                        matchedKeys.push(key);
+                    }
+                }
+                
+                // 2개의 감정이 모두 포함된 키를 우선 반환
+                const twoEmotionsKey = matchedKeys.find(key => key.includes(','));
+                if (twoEmotionsKey) return twoEmotionsKey;
+                
+                // 1개의 감정만 포함된 키가 있을 경우 반환
+                return matchedKeys[0] || null;
+            }
+        
+            const matchedEmotion = findMatchingEmotion(emotion);
+        
+            if (matchedEmotion) {
+                const fixedWidth = 100; // 고정된 너비 (픽셀 단위)
+                const fixedHeight = 100; // 고정된 높이 (픽셀 단위)
+            
+                const image = new Image();
+                image.src = orbTextures[matchedEmotion];
+            
+                // 이미지가 로드된 후 크기를 계산하여 xScale, yScale 적용
+                image.onload = function () {
+                    const xScale = fixedWidth / image.width;
+                    const yScale = fixedHeight / image.height;
+                
+                    const orb = Bodies.circle(window.innerWidth / 2, 50, 50, {
+                        restitution: 0.3, // 충돌 후 반발 계수
+                        friction: 0.01, // 마찰 계수
+                        density: 0.001, // 구슬의 밀도
+                        slop: 0.005, // 충돌 감지의 여유도 (작을수록 더 정확한 충돌 감지)
+                        render: {
+                            sprite: {
+                                texture: orbTextures[matchedEmotion],
+                                xScale: xScale,  // 고정된 너비에 맞춘 스케일
+                                yScale: yScale   // 고정된 높이에 맞춘 스케일
+                            }
+                        }
+                    });
+                
+                    World.add(world, orb);
+                };
+            } else {
+                console.log("No matching emotion found for:", emotion);
+            }
+        }
+        // Matter.js 경계(벽) 추가
+        function addBoundaries() {
+            const ground = Bodies.rectangle(window.innerWidth / 2, window.innerHeight + 30, window.innerWidth, 60, { isStatic: true });
+            const leftWall = Bodies.rectangle(-30, window.innerHeight / 2, 60, window.innerHeight, { isStatic: true });
+            const rightWall = Bodies.rectangle(window.innerWidth + 30, window.innerHeight / 2, 60, window.innerHeight, { isStatic: true });
+        
+            World.add(world, [ground, leftWall, rightWall]);
+        }
+        addBoundaries();
+
+        function createCharacterMessage(data) {
+            const characterImages = {
+                "슬픔": "./슬픔.png",
+                "기쁨": "./기쁨.png",
+                "불안": "./소심.png",
+                "화남": "./버럭.png",
+                "까칠": "./까칠.png"
+            };
+
+            const messageContainer = document.createElement('div');
+            messageContainer.className = 'output-item left left-item'; // 왼쪽 정렬
+
+            // 캐릭터 이미지
+            const characterImage = document.createElement('div');
+            characterImage.className = 'character-image';
+            characterImage.style.backgroundImage = `url(${characterImages[data.character]})`;
+
+            // 메시지 버블
+            const messageBubble = document.createElement('div');
+            messageBubble.className = 'output-bubble left';
+            messageBubble.innerHTML = `<p><strong>Your Emotion:</strong> ${data.emotion_prediction}</p>
+                                       <p><strong>Counseling Character:</strong> ${data.character}</p>
+                                       <p><strong>Character Response:</strong> ${data.character_response}</p>`;
+
+            // 캐릭터 이미지와 메시지 버블을 추가
+            messageContainer.appendChild(characterImage);
+            messageContainer.appendChild(messageBubble);
+
+            // 채팅 창에 추가
+            chatWindow.appendChild(messageContainer);
+        }
+
+        predictButton.addEventListener('click', async () => {
+            const userInput = inputText.value.trim();
+            if (!userInput) return;
+
+            const userBubble = document.createElement('div');
+            userBubble.className = 'output-item right';
+            userBubble.innerHTML = `<div class="output-bubble right">${userInput}</div>`;
+            chatWindow.appendChild(userBubble);
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sentence: userInput })
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                const data = await response.json();
+                const emotion = data.emotion_prediction.toLowerCase();
+
+                createCharacterMessage(data); // 캐릭터 이미지 및 메시지 생성
+                createOrb(emotion); // 감정 구슬 생성
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+                inputText.value = '';
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        });
+    </script>
+</body>
+</html>
